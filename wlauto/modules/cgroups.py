@@ -61,8 +61,10 @@ class CpusetGroup(object):
         else:
             self.directory = self.device.path.join(controller.mount_point, name)
             self.device.execute('mkdir -p {}'.format(self.directory), as_root=True)
-        self.cpus_file = self.device.path.join(self.directory, 'cpuset.cpus')
-        self.mems_file = self.device.path.join(self.directory, 'cpuset.mems')
+#        self.cpus_file = self.device.path.join(self.directory, 'cpuset.cpus')
+#        self.mems_file = self.device.path.join(self.directory, 'cpuset.mems')
+        self.cpus_file = self.device.path.join(self.directory, 'cpus')
+        self.mems_file = self.device.path.join(self.directory, 'mems')
         self.tasks_file = self.device.path.join(self.directory, 'tasks')
         self.set(cpus, mems)
 
@@ -146,11 +148,13 @@ class Cgroups(Module):
     capabilities = ['cgroups']
 
     controllers = [
-        CpusetController('wa_cpuset'),
+        CpusetController('cpuset'),
     ]
 
     parameters = [
-        Parameter('cgroup_root', default='/sys/fs/cgroup',
+#        Parameter('cgroup_root', default='/sys/fs/cgroup',
+#                  description='Location where cgroups are mounted on the device.'),
+        Parameter('cgroup_root', default='/dev',
                   description='Location where cgroups are mounted on the device.'),
     ]
 
