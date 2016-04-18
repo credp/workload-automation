@@ -21,13 +21,13 @@ import time
 
 import pexpect
 
-from wlauto import BigLittleDevice, Parameter
+from wlauto import BigLittleDevice, Parameter, RuntimeParameter
 from wlauto.exceptions import DeviceError
 from wlauto.utils.serial_port import open_serial_connection, pulse_dtr
 from wlauto.utils.android import adb_connect, adb_disconnect, adb_list_devices
 from wlauto.utils.uefi import UefiMenu, UefiConfig
 from wlauto.utils.uboot import UbootMenu
-
+from wlauto.utils.types import boolean
 
 AUTOSTART_MESSAGE = 'Press Enter to stop auto boot...'
 
@@ -86,6 +86,41 @@ class Juno(BigLittleDevice):
                                       'rootwait video=DVI-D-1:1920x1080R@60',
                   description='''Default boot arguments to use when boot_arguments were not.'''),
     ]
+
+    runtime_parameters = [
+        RuntimeParameter('ui', 'get_ui_status', 'set_ui_status', value_name='status'),
+    ]
+    ui_status = None
+
+    def get_ui_status(self):
+        return self.ui_status
+
+    def set_ui_status(self, status):
+        self.ui_status = boolean(status)
+        if self.ui_status is None:
+            pass
+        elif self.ui_status:
+            try:
+                self.execute('start')
+            except DeviceError:
+                pass
+        else:
+            try:
+                self.execute('stop')
+            except DeviceError:
+                pass
+
+    def stop(self):
+        if self.ui_status is None:
+            pass
+        elif not self.ui_status:
+            try:
+                self.execute('start')
+            except DeviceError:
+                pass
+        else:
+            pass
+        self.ui_status = None
 
     short_delay = 1
     firmware_prompt = 'Cmd>'
