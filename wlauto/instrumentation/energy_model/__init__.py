@@ -104,14 +104,35 @@ class PowerPerformanceAnalysis(object):
         self.summary = {}
         big_freqs = data[data.cluster == 'big'].frequency.unique()
         little_freqs = data[data.cluster == 'little'].frequency.unique()
-        self.summary['frequency'] = max(set(big_freqs).intersection(set(little_freqs)))
-
-        big_sc = data[(data.cluster == 'big') &
+        if len(set(big_freqs).intersection(set(little_freqs))):
+            self.summary['frequency'] = max(set(big_freqs).intersection(set(little_freqs)))
+            big_sc = data[(data.cluster == 'big') &
                       (data.frequency == self.summary['frequency']) &
                       (data.cpus == 1)]
-        little_sc = data[(data.cluster == 'little') &
+            little_sc = data[(data.cluster == 'little') &
                          (data.frequency == self.summary['frequency']) &
                          (data.cpus == 1)]
+        else: # no common frequency, let's cheat a little
+            diff = 999999999999
+            bigf=0
+            littlef=0
+            for big_freq in big_freqs:
+                for little_freq in little_freqs:
+                    if abs(big_freq-little_freq) < diff:
+                        littlef = little_freq
+                        bigf = big_freq
+                        diff = abs(big_freq-little_freq)
+            # now, we have the 2 closest freqs to use
+            self.summary['frequency'] = bigf
+            big_sc = data[(data.cluster == 'big') &
+                      (data.frequency == bigf) &
+                      (data.cpus == 1)]
+            little_sc = data[(data.cluster == 'little') &
+                         (data.frequency == littlef) &
+                         (data.cpus == 1)]
+            # since we are not comparing exactly the same frequency, we really ought to
+            # adjust the performance scores linearly, but we will be also using the power measured
+            # at those OPPs, so it is safer to leave them alone.
         self.summary['performance_ratio'] = big_sc.performance.item() / little_sc.performance.item()
         self.summary['power_ratio'] = big_sc.power.item() / little_sc.power.item()
         self.summary['max_performance'] = data[data.cpus == 1].performance.max()
