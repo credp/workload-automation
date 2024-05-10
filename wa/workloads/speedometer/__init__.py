@@ -30,7 +30,7 @@ from wa.utils.exec_control import once
 from wa.utils.misc import safe_extract
 
 from devlib.utils.android import adb_command
-
+from devlib.target import AndroidTarget
 
 class Speedometer(Workload):
 
@@ -120,6 +120,16 @@ class Speedometer(Workload):
                   The app package for the browser that will be launched.
                   """,
         ),
+        Parameter(
+            "target_server",
+            allowed_values=[True, False],
+            kind=bool,
+            default=False,
+            description="""
+                    The speedometer content will be pushed to the target
+                    and served using busybox httpd on port 8080.
+                    """,
+        ),
     ]
 
     def __init__(self, target, **kwargs):
@@ -130,7 +140,6 @@ class Speedometer(Workload):
     @once
     def initialize(self, context):
         super(Speedometer, self).initialize(context)
-        Speedometer.archive_server = ArchiveServer()
         if not self.target.is_rooted:
             raise WorkloadError(
                 "Device must be rooted for the speedometer workload currently"
@@ -157,6 +166,12 @@ class Speedometer(Workload):
         tarball = context.get_resource(File(self, "speedometer_archive.tgz"))
         with tarfile.open(name=tarball) as handle:
             safe_extract(handle, self.temp_dir.name)
+
+        if(self.target_server):
+            Speedometer.archive_server = TargetArchiveServer(self.target)
+        else:
+            Speedometer.archive_server = ArchiveServer()
+
         self.archive_server.start(self.document_root)
 
         Speedometer.speedometer_url = "http://localhost:{}/Speedometer2.0/index.html".format(
@@ -433,6 +448,42 @@ class ArchiveServer(object):
 
     def hide_from_device(self, target):
         adb_command(target.adb_name, "reverse --remove tcp:{}".format(self._port))
+
+    def get_port(self):
+        return self._port
+
+class TargetArchiveServer(object):
+    def __init__(self, target:AndroidTarget):
+        self._port = 8080
+        self._target = target
+
+    def start(self, document_root):
+        self.document_root = document_root
+        #decide where to put the extracted archive
+        self.target_root = self._target.get_workpath('speedometer_root')
+        #send the extracted archive
+        try:
+            self._target.remove(self.target_root, as_root=True)
+        except:
+            pass
+        self._target.push(self.document_root, self.target_root, as_root=True)
+        #launch busybox httpd server
+        self._httpd=self._target.background_invoke('/data/local/tmp/bin/busybox', 'httpd -p {} -h {}'.format(self._port, self.target_root))
+
+    def stop(self):
+        #stop busybox httpd server
+        self._httpd._cancel(10)
+        #clean up storage
+        self._target.remove(self.target_root, as_root=True)
+        pass
+
+    def expose_to_device(self, target):
+        #not needed
+        pass
+
+    def hide_from_device(self, target):
+        #not needed
+        pass
 
     def get_port(self):
         return self._port
